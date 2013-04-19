@@ -1,40 +1,29 @@
 ## Integration Testing
 
 Here is a suggested setup for JavaScript *client-side integration tests,*
-which test your Ember app in isolation from the backend. Our tests
+which test your Ember app in isolation from the backend. Our tests:
 
 * (re-)instantiate our app,
 * simulate user input (with jQuery), and
 * check that the results show up in the DOM correctly.
 
-We are also free to modify and check the state of the application's models
+We can also modify and check the state of the application's models
 directly, whenever it makes testing easier.
 
 By exercising the entire Ember app, we test that all its (individually simple)
 layers work together.
 
 Integration tests have a reputation for being slow and brittle. These
-client-side integration tests are not, because they do not require
-coordinating the backend and the frontend, so they can cover the bulk of our
-testing needs.
+client-side integration tests are not, however, because they do not
+require coordinating the backend and the frontend, so they can cover the
+bulk of our testing needs.
 
-### Setup
-
-We assume [Mocha](http://visionmedia.github.io/mocha/), but the instructions
-should be analogous for other testing frameworks, like
-[QUnit](http://qunitjs.com/).
+### Ember Setup
 
 ```javascript
 // Stop Ember from automatically scheduling run loops with setTimeout. It's
 // non-deterministic, which is bad for tests.
 Ember.testing = true;
-
-// Re-enable automatic run loops when testing is over, for easy debugging in
-// the console.
-after(function() { // after all tests have finished
-  Ember.testing = false;
-});
-
 
 App.reopen({
   // Use a separate root element so we don't interfere with the test reporter.
@@ -43,6 +32,33 @@ App.reopen({
 
 // Wait to initialize until we are done setting up.
 App.deferReadiness();
+
+// Do not muck with the URL, or URL state will leak between tests.
+App.Router.reopen({
+  location: 'none'
+});
+
+// Use the fixture adapter to pick up fixtures from App.Blog.FIXTURES, etc.
+App.Store.reopen({
+  adapter: DS.FixtureAdapter.extend({
+    // Make the adapter deterministic.
+    simulateRemoteResponse: false
+  })
+});
+```
+
+### Test Framework Setup
+
+We assume [Mocha](http://visionmedia.github.io/mocha/), but the instructions
+should be analogous for other testing frameworks, like
+[QUnit](http://qunitjs.com/).
+
+```javascript
+// Re-enable automatic run loops when testing is over, for easy debugging in
+// the console.
+after(function() { // after all tests have finished
+  Ember.testing = false;
+});
 
 before(function(done) { // before any tests have started
   // Now that the DOM is ready, add the root element.
@@ -60,27 +76,63 @@ before(function(done) { // before any tests have started
   });
 });
 
-
 // Reset the entire app before each test.
 beforeEach(function() {
   Ember.run(function() {
     App.reset();
   });
 });
+```
 
+#### Helper object
 
-// Do not muck with the URL, or URL state will leak between tests.
-App.Router.reopen({
-  location: 'none'
-});
+Your tests may need to do things like look at the DOM or start your
+Ember application somewhere. Here's some code for that:
 
+```javascript
+var helper = {};
 
-// Use the fixture adapter to pick up fixtures from App.Blog.FIXTURES, etc.
-App.Store.reopen({
-  adapter: DS.FixtureAdapter.extend({
-    // Make the adapter deterministic.
-    simulateRemoteResponse: false
+helper.transitionTo = function(a,b) {
+  Ember.run(function() {
+    b ? App.Router.router.transitionTo(a,b) : App.Router.router.transitionTo(a);
   })
+}
+
+helper.startAtRoute = function(a,b) {
+  beforeEach(function() {
+    b;
+    helper.transitionTo(a,b);
+  })
+}
+
+helper.$ = function(selector) {
+  return $("#test-app-container "+selector);
+}
+```
+
+#### Example Specs
+
+```javascript
+describe("index", function() {
+  beforeEach(function() {
+    this.widgets = helper.$(".widgets > li");
+  });
+
+  helper.startAtRoute("index");
+
+  it("has 2 widgets", function() {
+    expect(this.widgets.length).to.equal(2);
+  });
+
+  it("sets a CSS class", function() {
+    expect(this.widgets.className).to.equal("widgets");
+  })
+
+  it("highlights the things you click", function() {
+    this.widgets[0].click()
+    expect(this.widgets[0].className).to.equal("highlighted");
+  })
+
 });
 ```
 
@@ -110,3 +162,4 @@ Ember.run(function() { $('button.foo').click(); });
 
 `Ember.run` ensures that any state changes will have finished by the time it
 returns.
+

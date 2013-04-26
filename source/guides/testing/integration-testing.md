@@ -63,9 +63,7 @@ before(function(done) { // before any tests have started
 
 // Reset the entire app before each test.
 beforeEach(function() {
-  Ember.run(function() {
-    App.reset();
-  });
+  App.reset();
 });
 
 

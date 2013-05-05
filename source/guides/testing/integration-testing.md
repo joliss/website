@@ -3,9 +3,9 @@
 Here is a suggested setup for JavaScript *client-side integration tests,*
 which test your Ember app in isolation from the backend. Our tests
 
-* (re-)instantiate our app,
-* simulate user input (with jQuery), and
-* check that the results show up in the DOM correctly.
+* Instantiate and reinstantiating our app
+* Simulate user input with jQuery
+* Check that the results show up in the DOM correctly.
 
 We are also free to modify and check the state of the application's models
 directly, whenever it makes testing easier.
@@ -25,24 +25,34 @@ should be analogous for other testing frameworks, like
 [QUnit](http://qunitjs.com/).
 
 ```javascript
+//------ Setup app for testing ------
+
 // Stop Ember from automatically scheduling run loops with setTimeout. It's
 // non-deterministic, which is bad for tests.
 Ember.testing = true;
 
-// Re-enable automatic run loops when testing is over, for easy debugging in
-// the console.
-after(function() { // after all tests have finished
-  Ember.testing = false;
+// Wait to initialize until we are done setting up.
+App.deferReadiness();
+
+// Do not muck with the URL, or URL state will leak between tests.
+App.Router.reopen({
+  location: 'none'
 });
 
+// Use the fixture adapter to pick up fixtures from App.Blog.FIXTURES, etc.
+App.Store.reopen({
+  adapter: DS.FixtureAdapter.extend({
+    // Make the adapter deterministic.
+    simulateRemoteResponse: false
+  })
+});
 
 App.reopen({
   // Use a separate root element so we don't interfere with the test reporter.
   rootElement: '#test-app-container'
 });
 
-// Wait to initialize until we are done setting up.
-App.deferReadiness();
+//----- Setup for tests -----
 
 before(function(done) { // before any tests have started
   // Now that the DOM is ready, add the root element.
@@ -60,27 +70,15 @@ before(function(done) { // before any tests have started
   });
 });
 
+// Re-enable automatic run loops when testing is over, for easy debugging in
+// the console.
+after(function() { // after all tests have finished
+  Ember.testing = false;
+});
 
 // Reset the entire app before each test.
 beforeEach(function() {
-  Ember.run(function() {
-    App.reset();
-  });
-});
-
-
-// Do not muck with the URL, or URL state will leak between tests.
-App.Router.reopen({
-  location: 'none'
-});
-
-
-// Use the fixture adapter to pick up fixtures from App.Blog.FIXTURES, etc.
-App.Store.reopen({
-  adapter: DS.FixtureAdapter.extend({
-    // Make the adapter deterministic.
-    simulateRemoteResponse: false
-  })
+  App.reset();
 });
 ```
 
